@@ -1,7 +1,10 @@
 #pragma once
 #include <SDL2/SDL.h>
 #include "Cells.h"
+#include "Entity.h"
 #include "Player.h"
+#include <vector>
+
 
 class Engine {
 private:
@@ -11,6 +14,8 @@ private:
 
     Grid grid;
     Player player;
+    
+    std::vector<Entity> entities;
 
     Uint64 lastTime = 0;
 

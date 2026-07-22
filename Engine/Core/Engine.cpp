@@ -49,7 +49,6 @@ void Engine::ProcessInput() {
         }
     }
 
-    // Ввод мыши для редактора
     Uint32 mouseState = SDL_GetMouseState(nullptr, nullptr);
     int mouseX, mouseY;
     SDL_GetMouseState(&mouseX, &mouseY);
@@ -58,10 +57,37 @@ void Engine::ProcessInput() {
     int cellY = mouseY / CELL_SIZE;
 
     if (cellX >= 0 && cellX < GRID_WIDTH && cellY >= 0 && cellY < GRID_HEIGHT) {
+        // ЛКМ - ставим красную стену (как было)
         if (mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) {
             grid.cells[cellY][cellX].isEmpty = false;
-        } else if (mouseState & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
+        } 
+        // ПКМ - стираем стену (как было)
+        else if (mouseState & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
             grid.cells[cellY][cellX].isEmpty = true;
+        }
+        // СРЕДНЯЯ КНОПКА МЫШИ (Колесико) - Спавним Entity (Инстанцирование)
+        else if (mouseState & SDL_BUTTON(SDL_BUTTON_MIDDLE)) {
+            // Проверяем, что клетка пустая, чтобы не спавнить в стенах
+            if (grid.cells[cellY][cellX].isEmpty) {
+                // 1. Вычисляем идеально ровные координаты (Align to grid)
+                float spawnX = cellX * CELL_SIZE;
+                float spawnY = cellY * CELL_SIZE;
+
+                // 2. Создаем синий квадратик (Entity) чуть меньше клетки
+                Entity newEntity(spawnX + 2, spawnY + 2, 16, 16, 0.2f, 0.5f, 0.9f);
+                
+                // 3. Добавляем в мир!
+                entities.push_back(newEntity);
+                
+                // Чтобы не наспавнить 100 штук за один клик (пока мышка зажата),
+                // временно "заблокируем" клетку, сделав её не пустой 
+                // (или можешь убрать эту строчку, если хочешь спавнить кучу)
+                grid.cells[cellY][cellX].isEmpty = false; 
+                // Сделаем цвет клетки серым, чтобы было видно, что там кто-то стоит
+                grid.cells[cellY][cellX].r = 0.2f;
+                grid.cells[cellY][cellX].g = 0.2f;
+                grid.cells[cellY][cellX].b = 0.2f;
+            }
         }
     }
 }
@@ -76,6 +102,11 @@ void Engine::Render() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     grid.Draw();
+    
+    for (Entity& e : entities) {
+        e.Draw();
+    }
+    
     player.Draw();
 
     SDL_GL_SwapWindow(window);
