@@ -6,8 +6,21 @@
 Engine::Engine() {}
 
 Engine::~Engine() {
-    if (glContext) SDL_GL_DeleteContext(glContext);
-    if (window) SDL_DestroyWindow(window);
+    for (Entity* entity : entities) {
+        delete entity;
+    }
+    entities.clear();
+
+    if (glContext) {
+        SDL_GL_DeleteContext(glContext);
+        glContext = nullptr;
+    }
+
+    if (window) {
+        SDL_DestroyWindow(window);
+        window = nullptr;
+    }
+
     SDL_Quit();
 }
 
@@ -27,9 +40,20 @@ bool Engine::Init(const char* title, int width, int height) {
         SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN
     );
 
-    if (!window) return false;
+    if (!window) {
+        std::cerr << "SDL window error: " << SDL_GetError() << std::endl;
+        SDL_Quit();
+        return false;
+    }
 
     glContext = SDL_GL_CreateContext(window);
+    if (!glContext) {
+        std::cerr << "OpenGL context error: " << SDL_GetError() << std::endl;
+        SDL_DestroyWindow(window);
+        window = nullptr;
+        SDL_Quit();
+        return false;
+    }
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -44,88 +68,109 @@ bool Engine::Init(const char* title, int width, int height) {
 
 void Engine::ProcessInput() {
     SDL_Event event;
+
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) {
             isRunning = false;
         }
-        
-        // --- 1. Одиночные нажатия клавиш (Тоггл Аллайна) ---
+
+        // --- Одиночные нажатия клавиш ---
         if (event.type == SDL_KEYDOWN) {
-            if (event.key.keysym.sym == SDLK_g) { 
-                useGridAlign = !useGridAlign; // Включаем/Выключаем прилипание
-                std::cout << "Grid Align is now: " << (useGridAlign ? "ON" : "OFF") << std::endl;
+            if (event.key.keysym.sym == SDLK_g) {
+                useGridAlign = !useGridAlign;
+                std::cout << "Grid Align is now: "
+                          << (useGridAlign ? "ON" : "OFF")
+                          << std::endl;
             }
         }
     }
 
-    // --- 2. НЕПРЕРЫВНОЕ ЗАЖАТИЕ МЫШИ (Режим "Кисти") ---
-    Uint32 mouseState = SDL_GetMouseState(nullptr, nullptr);
+    // --- НЕПРЕРЫВНОЕ ЗАЖАТИЕ МЫШИ ---
     int mouseX, mouseY;
-    SDL_GetMouseState(&mouseX, &mouseY);
+    Uint32 mouseState = SDL_GetMouseState(&mouseX, &mouseY);
 
     int cellX = mouseX / CELL_SIZE;
     int cellY = mouseY / CELL_SIZE;
 
-    // Проверяем, зажат ли Shift
     bool isShiftPressed = (SDL_GetModState() & KMOD_SHIFT) != 0;
 
-    // Проверяем, что мышка не ушла за пределы окна
-    if (cellX >= 0 && cellX < GRID_WIDTH && cellY >= 0 && cellY < GRID_HEIGHT) {
-        
-        // ЕСЛИ ЗАЖАТА ЛЕВАЯ КНОПКА МЫШИ (Рисуем)
+    if (cellX >= 0 && cellX < GRID_WIDTH &&
+        cellY >= 0 && cellY < GRID_HEIGHT) {
+
+        // ==========================================================
+        // ЛЕВАЯ КНОПКА МЫШИ
+        // ==========================================================
         if (mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) {
-            
+
             if (isShiftPressed) {
                 // --- РИСУЕМ СУЩНОСТИ (Shift + ЛКМ) ---
                 float spawnX, spawnY;
-                
-                // Проверяем наш тоггл: прилипать к сетке или нет?
-                if (useGridAlign) {
+
+                if (useGridAlign)
                     grid.Align(mouseX, mouseY, spawnX, spawnY);
-                } else {
+                else {
                     spawnX = mouseX;
                     spawnY = mouseY;
                 }
 
-                // ЗАЩИТА ОТ СПАМА КЛОНОВ: 
-                // Проверяем, нет ли уже сущности ровно в этих координатах
+                // Проверяем через ECS Registry
                 bool alreadyExists = false;
-                for (const Entity& e : entities) {
-                    if (std::abs(e.x - spawnX) < 1.0f && std::abs(e.y - spawnY) < 1.0f) {
+                for (uint32_t i = 0; i < registry.active.size(); i++) {
+                    if (registry.active[i] &&
+                        std::abs(registry.transforms[i].x - spawnX) < 1.0f &&
+                        std::abs(registry.transforms[i].y - spawnY) < 1.0f) {
                         alreadyExists = true;
                         break;
                     }
                 }
 
-                // Если место свободно — спавним!
                 if (!alreadyExists) {
-                    Entity newEntity(spawnX, spawnY, 16, 16, 0.2f, 0.5f, 0.9f);
-                    entities.push_back(newEntity);
+                    // Создаем ECS-сущность
+                    uint32_t newId = registry.CreateEntity();
+
+                    // Создаем игровой объект
+                    entities.push_back(
+                        new SlimeEnemy(newId, &registry, spawnX, spawnY)
+                    );
+
+                    // Для патрульного:
+                    // entities.push_back(
+                    //     new PatrolBot(newId, &registry, spawnX, spawnY)
+                    // );
                 }
-            } else {
-                // --- РИСУЕМ СТЕНЫ (Просто ЛКМ) ---
+            }
+            else {
+                // --- РИСУЕМ СТЕНЫ ---
                 grid.cells[cellY][cellX].isEmpty = false;
             }
-        } 
-        
-        // ЕСЛИ ЗАЖАТА ПРАВАЯ КНОПКА МЫШИ (Стираем)
+        }
+
+        // ==========================================================
+        // ПРАВАЯ КНОПКА МЫШИ
+        // ==========================================================
         else if (mouseState & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-            
+
             if (isShiftPressed) {
-                // --- СТИРАЕМ СУЩНОСТИ (Shift + ПКМ) ---
-                // Ищем сущность, на которую наведена мышка, и удаляем её
+                // --- СТИРАЕМ СУЩНОСТИ ---
                 auto it = entities.begin();
                 while (it != entities.end()) {
-                    // Если курсор мыши находится внутри квадрата сущности
-                    if (mouseX >= it->x && mouseX <= it->x + it->width &&
-                        mouseY >= it->y && mouseY <= it->y + it->height) {
-                        it = entities.erase(it); // Удаляем из списка
-                    } else {
+
+                    if (mouseX >= (*it)->x &&
+						mouseX <= (*it)->x + (*it)->width &&
+						mouseY >= (*it)->y &&
+						mouseY <= (*it)->y + (*it)->height) {
+
+                        registry.DestroyEntity((*it)->GetId());
+                        delete *it;
+                        it = entities.erase(it);
+                    }
+                    else {
                         ++it;
                     }
                 }
-            } else {
-                // --- СТИРАЕМ СТЕНЫ (Просто ПКМ) ---
+            }
+            else {
+                // --- СТИРАЕМ СТЕНЫ ---
                 grid.cells[cellY][cellX].isEmpty = true;
             }
         }
@@ -135,6 +180,11 @@ void Engine::ProcessInput() {
 void Engine::Update(float dt) {
     const Uint8* keyboardState = SDL_GetKeyboardState(NULL);
     player.Update(dt, keyboardState);
+
+    // 1. ООП ЛОГИКА: Мы вызываем Update() у твоих классов
+    for (Entity* e : entities) {
+        e->Update(dt); 
+    }
 }
 
 void Engine::Render() {
@@ -143,12 +193,24 @@ void Engine::Render() {
 
     grid.Draw();
     
-    for (Entity& e : entities) {
-        e.Draw();
-    }
-    
-    player.Draw();
+    // 2. ECS РЕНДЕР: Мы ВООБЩЕ НЕ ИСПОЛЬЗУЕМ классы! 
+    // Видеокарта читает напрямую плотные сырые массивы из Подвала!
+    for (uint32_t i = 0; i < registry.active.size(); i++) {
+        if (!registry.active[i]) continue;
+        
+        CTransform& t = registry.transforms[i];
+        CSprite& s = registry.sprites[i];
 
+        glColor3f(s.r, s.g, s.b);
+        glBegin(GL_QUADS);
+            glVertex2f(t.x, t.y);
+            glVertex2f(t.x + s.width, t.y);
+            glVertex2f(t.x + s.width, t.y + s.height);
+            glVertex2f(t.x, t.y + s.height);
+        glEnd();
+    }
+
+    player.Draw();
     SDL_GL_SwapWindow(window);
 }
 

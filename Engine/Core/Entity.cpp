@@ -1,22 +1,33 @@
 #include "Entity.h"
-#include <SDL2/SDL_opengl.h>
 
-Entity::Entity(float startX, float startY, float w, float h, float red, float green, float blue) {
-    x = startX;
-    y = startY;
-    width = w;
-    height = h;
-    r = red;
-    g = green;
-    b = blue;
+Entity::Entity(uint32_t id, Registry* reg) {
+    this->id = id;
+    this->reg = reg;
 }
 
-void Entity::Draw() {
-    glColor3f(r, g, b);
-    glBegin(GL_QUADS);
-        glVertex2f(x, y);
-        glVertex2f(x + width, y);
-        glVertex2f(x + width, y + height);
-        glVertex2f(x, y + height);
-    glEnd();
+// Заметь: мы меняем данные НЕ в классе, а напрямую в массивах ECS!
+void Entity::SetPos(float x, float y) {
+    if (!reg || id >= reg->transforms.size()) return;
+
+    reg->transforms[id].x = x;
+    reg->transforms[id].y = y;
+    this->x = x;
+    this->y = y;
+}
+
+void Entity::SetColor(float r, float g, float b) {
+    if (!reg || id >= reg->sprites.size()) return;
+
+    reg->sprites[id].r = r;
+    reg->sprites[id].g = g;
+    reg->sprites[id].b = b;
+}
+
+void Entity::SetSize(float w, float h) {
+    if (!reg || id >= reg->sprites.size()) return;
+
+    reg->sprites[id].width = w;
+    reg->sprites[id].height = h;
+    this->width = w;
+    this->height = h;
 }

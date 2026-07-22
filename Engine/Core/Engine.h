@@ -2,6 +2,8 @@
 #include <SDL2/SDL.h>
 #include "Cells.h"
 #include "Entity.h"
+#include "Registry.h"
+#include "MyEntities.h"
 #include "Player.h"
 #include <vector>
 
@@ -15,8 +17,9 @@ private:
 
     Grid grid;
     Player player;
+    Registry registry;
     
-    std::vector<Entity> entities;
+    std::vector<Entity*> entities;
 
     Uint64 lastTime = 0;
 

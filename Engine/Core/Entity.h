@@ -1,14 +1,26 @@
 #pragma once
+#include "Registry.h"
 
-// Базовый класс для всех объектов в игре
+// БАЗОВЫЙ КЛАСС (Скелет)
 class Entity {
 public:
-    float x, y;
-    float width, height;
-    float r, g, b; // Цвет сущности
+    uint32_t id;
+    Registry* reg; // Ссылка на подвал
+    float x = 0.0f;
+    float y = 0.0f;
+    float width = 16.0f;
+    float height = 16.0f;
 
-    // Конструктор: задаем позицию, размер и цвет при создании
-    Entity(float startX, float startY, float w, float h, float red, float green, float blue);
+    Entity(uint32_t id, Registry* reg);
+    virtual ~Entity() = default;
 
-    void Draw();
+    uint32_t GetId() const { return id; }
+
+    // Удобные функции-обертки для тебя (Фасад)
+    void SetPos(float x, float y);
+    void SetColor(float r, float g, float b);
+    void SetSize(float w, float h);
+
+    // Виртуальная функция! Именно её ты будешь переписывать в своих префабах
+    virtual void Update(float dt) {}
 };
