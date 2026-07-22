@@ -1,6 +1,5 @@
 #pragma once
 #include <SDL2/SDL.h>
-#include "Cells.h" // Подключаем сетку, чтобы уметь с ней сталкиваться
 
 class Player {
 public:
@@ -10,6 +9,6 @@ public:
     float height = 18.0f;
     float speed = 200.0f;
 
-    void Update(float dt, const Uint8* keyboardState, Grid& grid);
+    void Update(float dt, const Uint8* keyboardState);
     void Draw();
 };

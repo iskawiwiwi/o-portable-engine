@@ -14,20 +14,12 @@ void Grid::Clear() {
     }
 }
 
-bool Grid::CheckCollision(float x, float y, float w, float h) {
-    int startX = std::max(0, static_cast<int>(x / CELL_SIZE));
-    int endX   = std::min(GRID_WIDTH - 1, static_cast<int>((x + w - 0.01f) / CELL_SIZE));
-    int startY = std::max(0, static_cast<int>(y / CELL_SIZE));
-    int endY   = std::min(GRID_HEIGHT - 1, static_cast<int>((y + h - 0.01f) / CELL_SIZE));
-
-    for (int cy = startY; cy <= endY; ++cy) {
-        for (int cx = startX; cx <= endX; ++cx) {
-            if (!cells[cy][cx].isEmpty) {
-                return true; 
-            }
-        }
-    }
-    return false;
+void Grid::Align(float inX, float inY, float& outX, float& outY) {
+    int cellX = static_cast<int>(inX) / CELL_SIZE;
+    int cellY = static_cast<int>(inY) / CELL_SIZE;
+    
+    outX = cellX * CELL_SIZE;
+    outY = cellY * CELL_SIZE;
 }
 
 void Grid::Draw() {

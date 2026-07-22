@@ -1,6 +1,7 @@
 #include "Engine.h"
 #include <SDL2/SDL_opengl.h>
 #include <iostream>
+#include <cmath>
 
 Engine::Engine() {}
 
@@ -47,8 +48,17 @@ void Engine::ProcessInput() {
         if (event.type == SDL_QUIT) {
             isRunning = false;
         }
+        
+        // --- 1. Одиночные нажатия клавиш (Тоггл Аллайна) ---
+        if (event.type == SDL_KEYDOWN) {
+            if (event.key.keysym.sym == SDLK_g) { 
+                useGridAlign = !useGridAlign; // Включаем/Выключаем прилипание
+                std::cout << "Grid Align is now: " << (useGridAlign ? "ON" : "OFF") << std::endl;
+            }
+        }
     }
 
+    // --- 2. НЕПРЕРЫВНОЕ ЗАЖАТИЕ МЫШИ (Режим "Кисти") ---
     Uint32 mouseState = SDL_GetMouseState(nullptr, nullptr);
     int mouseX, mouseY;
     SDL_GetMouseState(&mouseX, &mouseY);
@@ -56,37 +66,67 @@ void Engine::ProcessInput() {
     int cellX = mouseX / CELL_SIZE;
     int cellY = mouseY / CELL_SIZE;
 
-    if (cellX >= 0 && cellX < GRID_WIDTH && cellY >= 0 && cellY < GRID_HEIGHT) {
-        // ЛКМ - ставим красную стену (как было)
-        if (mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) {
-            grid.cells[cellY][cellX].isEmpty = false;
-        } 
-        // ПКМ - стираем стену (как было)
-        else if (mouseState & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-            grid.cells[cellY][cellX].isEmpty = true;
-        }
-        // СРЕДНЯЯ КНОПКА МЫШИ (Колесико) - Спавним Entity (Инстанцирование)
-        else if (mouseState & SDL_BUTTON(SDL_BUTTON_MIDDLE)) {
-            // Проверяем, что клетка пустая, чтобы не спавнить в стенах
-            if (grid.cells[cellY][cellX].isEmpty) {
-                // 1. Вычисляем идеально ровные координаты (Align to grid)
-                float spawnX = cellX * CELL_SIZE;
-                float spawnY = cellY * CELL_SIZE;
+    // Проверяем, зажат ли Shift
+    bool isShiftPressed = (SDL_GetModState() & KMOD_SHIFT) != 0;
 
-                // 2. Создаем синий квадратик (Entity) чуть меньше клетки
-                Entity newEntity(spawnX + 2, spawnY + 2, 16, 16, 0.2f, 0.5f, 0.9f);
+    // Проверяем, что мышка не ушла за пределы окна
+    if (cellX >= 0 && cellX < GRID_WIDTH && cellY >= 0 && cellY < GRID_HEIGHT) {
+        
+        // ЕСЛИ ЗАЖАТА ЛЕВАЯ КНОПКА МЫШИ (Рисуем)
+        if (mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+            
+            if (isShiftPressed) {
+                // --- РИСУЕМ СУЩНОСТИ (Shift + ЛКМ) ---
+                float spawnX, spawnY;
                 
-                // 3. Добавляем в мир!
-                entities.push_back(newEntity);
-                
-                // Чтобы не наспавнить 100 штук за один клик (пока мышка зажата),
-                // временно "заблокируем" клетку, сделав её не пустой 
-                // (или можешь убрать эту строчку, если хочешь спавнить кучу)
-                grid.cells[cellY][cellX].isEmpty = false; 
-                // Сделаем цвет клетки серым, чтобы было видно, что там кто-то стоит
-                grid.cells[cellY][cellX].r = 0.2f;
-                grid.cells[cellY][cellX].g = 0.2f;
-                grid.cells[cellY][cellX].b = 0.2f;
+                // Проверяем наш тоггл: прилипать к сетке или нет?
+                if (useGridAlign) {
+                    grid.Align(mouseX, mouseY, spawnX, spawnY);
+                } else {
+                    spawnX = mouseX;
+                    spawnY = mouseY;
+                }
+
+                // ЗАЩИТА ОТ СПАМА КЛОНОВ: 
+                // Проверяем, нет ли уже сущности ровно в этих координатах
+                bool alreadyExists = false;
+                for (const Entity& e : entities) {
+                    if (std::abs(e.x - spawnX) < 1.0f && std::abs(e.y - spawnY) < 1.0f) {
+                        alreadyExists = true;
+                        break;
+                    }
+                }
+
+                // Если место свободно — спавним!
+                if (!alreadyExists) {
+                    Entity newEntity(spawnX, spawnY, 16, 16, 0.2f, 0.5f, 0.9f);
+                    entities.push_back(newEntity);
+                }
+            } else {
+                // --- РИСУЕМ СТЕНЫ (Просто ЛКМ) ---
+                grid.cells[cellY][cellX].isEmpty = false;
+            }
+        } 
+        
+        // ЕСЛИ ЗАЖАТА ПРАВАЯ КНОПКА МЫШИ (Стираем)
+        else if (mouseState & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
+            
+            if (isShiftPressed) {
+                // --- СТИРАЕМ СУЩНОСТИ (Shift + ПКМ) ---
+                // Ищем сущность, на которую наведена мышка, и удаляем её
+                auto it = entities.begin();
+                while (it != entities.end()) {
+                    // Если курсор мыши находится внутри квадрата сущности
+                    if (mouseX >= it->x && mouseX <= it->x + it->width &&
+                        mouseY >= it->y && mouseY <= it->y + it->height) {
+                        it = entities.erase(it); // Удаляем из списка
+                    } else {
+                        ++it;
+                    }
+                }
+            } else {
+                // --- СТИРАЕМ СТЕНЫ (Просто ПКМ) ---
+                grid.cells[cellY][cellX].isEmpty = true;
             }
         }
     }
@@ -94,7 +134,7 @@ void Engine::ProcessInput() {
 
 void Engine::Update(float dt) {
     const Uint8* keyboardState = SDL_GetKeyboardState(NULL);
-    player.Update(dt, keyboardState, grid);
+    player.Update(dt, keyboardState);
 }
 
 void Engine::Render() {

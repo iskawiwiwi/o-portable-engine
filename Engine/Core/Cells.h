@@ -10,7 +10,7 @@ const int GRID_HEIGHT = SCREEN_HEIGHT / CELL_SIZE;
 
 struct Cell {
     bool isEmpty = true;
-    float r = 0.8f, g = 0.3f, b = 0.3f;
+    float r = 0.9f, g = 0.9f, b = 0.9f;
 };
 
 class Grid {
@@ -19,6 +19,6 @@ public:
 
     Grid();
     void Clear();
-    bool CheckCollision(float x, float y, float w, float h);
+    void Align(float inX, float inY, float& outX, float& outY);
     void Draw();
 };

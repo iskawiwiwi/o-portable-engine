@@ -11,6 +11,7 @@ private:
     SDL_Window* window = nullptr;
     SDL_GLContext glContext = nullptr;
     bool isRunning = false;
+    bool useGridAlign = true;
 
     Grid grid;
     Player player;

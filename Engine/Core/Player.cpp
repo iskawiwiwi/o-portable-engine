@@ -1,7 +1,7 @@
 #include "Player.h"
 #include <SDL2/SDL_opengl.h>
 
-void Player::Update(float dt, const Uint8* keyboardState, Grid& grid) {
+void Player::Update(float dt, const Uint8* keyboardState) {
     float moveX = 0.0f;
     float moveY = 0.0f;
 
@@ -15,17 +15,9 @@ void Player::Update(float dt, const Uint8* keyboardState, Grid& grid) {
         moveY *= 0.7071f;
     }
 
-    // Движение по X
-    float nextX = x + moveX * speed * dt;
-    if (!grid.CheckCollision(nextX, y, width, height)) {
-        x = nextX;
-    }
-
-    // Движение по Y
-    float nextY = y + moveY * speed * dt;
-    if (!grid.CheckCollision(x, nextY, width, height)) {
-        y = nextY;
-    }
+    // Временно просто двигаем игрока (без коллизий)
+    x += moveX * speed * dt;
+    y += moveY * speed * dt;
 }
 
 void Player::Draw() {
